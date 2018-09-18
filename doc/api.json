@@ -1,0 +1,34 @@
+// GET /api/files/<path-to-file>
+// response examples:
+// 1. Folder
+{
+  "type":"folder",
+  "name":"example-folder",
+  "content":[
+    {
+      "type":"file",
+      "media-type":"jpeg",
+      "name":"IMG_1234.jpg",
+      "url":"/files/example/path/to/folder/example-folder/IMG_1234.jpg"
+    },
+    {
+      "type":"file",
+      "media-type":"jpeg",
+      "name":"IMG_1235.jpg",
+      "url":"/files/example/path/to/folder/example-folder/IMG_1235.jpg"
+    },
+    {
+      "type":"file",
+      "media-type":"text",
+      "name":"description.txt",
+      "url":"/files/example/path/to/folder/example-folder/description.txt"
+    },
+    {
+      "type":"folder",
+      "name":"inner-folder"
+    }
+  ]
+}
+
+//GET /files/<path-to-file>
+//response is actual file
