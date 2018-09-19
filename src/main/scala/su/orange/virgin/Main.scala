@@ -4,9 +4,10 @@ import java.io.File
 import java.net.{URLConnection, URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 
+import akka.Done
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.javadsl.server.Route
-import akka.http.scaladsl.Http
+import akka.http.scaladsl.{Http, server}
 import akka.http.scaladsl.coding.Deflate
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
@@ -14,16 +15,19 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.model.StatusCodes.MovedPermanently
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Directives, HttpApp}
+import akka.http.scaladsl.settings.ServerSettings
 import akka.http.scaladsl.unmarshalling.FromRequestUnmarshaller
 import akka.japi.Option.Some
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import spray.json.{DefaultJsonProtocol, JsArray, JsObject, JsString, JsValue, RootJsonFormat}
 
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.io.StdIn
 
-object Main {
+object Main extends HttpApp {
 
   abstract class fsObject {
     def name: String
@@ -61,47 +65,54 @@ object Main {
   var port: Int = 0
   var rootFolder: String = ""
 
+  class MyJsonService extends Directives with JsonSupport {
+    val route = {
+      pathPrefix("api" / RemainingPath) { filePath =>
+        get {
+          complete(listFiles(URLDecoder.decode(filePath.toString(), StandardCharsets.UTF_8.displayName()), rootFolder))
+        }
+      } ~
+        pathPrefix("files" / RemainingPath) { filePath =>
+          get {
+            getFromDirectory(rootFolder + "/" + URLDecoder.decode(filePath.toString(), StandardCharsets.UTF_8.displayName()))
+          }
+        }
+    }
+  }
+
+  val service = new MyJsonService
+
+  override protected def routes: server.Route = service.route
+
   def main(args: Array[String]): Unit = {
 
     host = args(0)
     port = args(1).toInt
     rootFolder = args(2)
+    val settings = ServerSettings(ConfigFactory.load).withVerboseErrorMessages(true)
+    startServer("localhost", port, settings)
+  }
 
 
-    implicit val system = ActorSystem("my-system")
-    implicit val materializer = ActorMaterializer()
-    implicit val executionContext = system.dispatcher
-
-    class MyJsonService extends Directives with JsonSupport {
-      val route = {
-        pathPrefix("api" / RemainingPath) { filePath =>
-          get {
-            complete(listFiles(URLDecoder.decode(filePath.toString(), StandardCharsets.UTF_8.displayName()), rootFolder))
-          }
-        } ~
-          pathPrefix("files" / RemainingPath) { filePath =>
-            get {
-              getFromDirectory(rootFolder + "/" + URLDecoder.decode(filePath.toString(), StandardCharsets.UTF_8.displayName()))
-            }
-          }
+  override protected def waitForShutdownSignal(system: ActorSystem)(implicit ec: ExecutionContext): Future[Done] = {
+    val promise = Promise[Done]()
+    sys.addShutdownHook {
+      promise.trySuccess(Done)
+    }
+    Future {
+      blocking {
       }
     }
-
-    val service = new MyJsonService
-
-    val bindingFuture = Http().bindAndHandle(service.route, host, port)
-
-    println("Server online at http://" + host + ":" + port + " with root folder set to " + rootFolder + "/\nPress RETURN to stop...")
-    StdIn.readLine() // let it run until user presses return
-    bindingFuture
-      .flatMap(_.unbind()) // trigger unbinding from the port
-      .onComplete(_ => system.terminate()) // and shutdown when done
+    promise.future
   }
 
   def listFiles(path: String, rootFolder: String): Seq[fsObject] = {
     val dir = new File(rootFolder + "/" + path)
     if (dir.exists && dir.isDirectory) {
-      dir.listFiles.filter(isNotHidden).map(f => fsToVfile(f, rootFolder)).map(res => {println(res); res})
+      dir.listFiles.filter(isNotHidden).map(f => fsToVfile(f, rootFolder)).map(res => {
+        println(res);
+        res
+      })
     } else {
       List[fsObject]()
     }
