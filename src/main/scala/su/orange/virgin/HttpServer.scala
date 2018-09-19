@@ -1,8 +1,5 @@
 package su.orange.virgin
 
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
-
 import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.{Directives, HttpApp, Route}
@@ -13,19 +10,22 @@ class HttpServer(fs: FileSystem, settings: Settings) extends HttpApp {
 
   class RoutingService extends Directives with JsonSupport {
     val route = {
-      path("api") {
-        get {
-          complete(fs.listFiles(""))
-        }
-      } ~
-        pathPrefix("api" / RemainingPath) { filePath =>
+      pathPrefix("api") {
+        path("fs") {
           get {
-            complete(fs.listFiles(URLDecoder.decode(filePath.toString(), StandardCharsets.UTF_8.displayName())))
+            complete(fs.listFiles(""))
           }
         } ~
+          pathPrefix("fs" / RemainingPath) { filePath =>
+            get {
+              complete(fs.listFiles(filePath.toString()))
+            }
+          }
+
+      } ~
         pathPrefix("files" / RemainingPath) { filePath =>
           get {
-            getFromDirectory(settings.rootFolder + "/" + URLDecoder.decode(filePath.toString(), StandardCharsets.UTF_8.displayName()))
+            getFromDirectory(fs.getLocalFilePath(filePath.toString()))
           }
         }
     }

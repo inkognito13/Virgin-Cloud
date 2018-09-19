@@ -1,44 +1,53 @@
 package su.orange.virgin
 
 import java.io.File
-import java.net.{URLConnection, URLEncoder}
+import java.net.{URLConnection, URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 
 import akka.japi.Option.Some
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.LoggerFactory
 
-class FileSystem(val settings: Settings) {
+class FileSystem(settings: Settings) {
   val log = LoggerFactory.getLogger(this.getClass)
-  def listFiles(path: String): Seq[FSObject] = {
-    val dir = new File(settings.rootFolder + "/" + path)
+  private final val UTF_8 = StandardCharsets.UTF_8.displayName()
+
+  def listFiles(remotePath: String): Seq[FSObject] = {
+    val localPath = getLocalFilePath(remotePath)
+    log.debug("Listing files in " + localPath)
+    val dir = new File(localPath)
     if (dir.exists && dir.isDirectory) {
-      dir.listFiles.filter(isNotHidden).map(f => fsToVfile(f, settings.rootFolder)).map(res => {
-        log.debug("Scanned file "+res)
-        res
-      })
+      val res = dir.listFiles.filter(isNotHidden).map(f => fsToVFile(f, settings.rootFolder))
+      log.debug("Found " + res.length + " files in " + localPath)
+      log.trace(res.map(_.toString).mkString(", \n"))
+      res
     } else {
-      List[FSObject]()
+      throw new IllegalArgumentException(localPath + " is not a directory or not exists")
     }
   }
+
+  def getLocalFilePath(remoteFilePath: String) =
+    settings.rootFolder + "/" + URLDecoder.decode(remoteFilePath, UTF_8)
 
   private def isNotHidden(f: File) = !f.getName.startsWith(".")
 
-  private def fsToVfile(file: File, rootFolder: String): FSObject = {
+  private def fsToVFile(file: File, rootFolder: String): FSObject = {
     if (file.isDirectory) {
-      vFolder(file.getName,
-        URLEncoder.encode(absolutePathToPathFromRootFolder(file.getAbsolutePath, rootFolder), StandardCharsets.UTF_8.displayName())
-      )
+      vFolder(file.getName, encodedFilePath(file))
     } else {
-      vFile(
-        file.getName,
-        URLEncoder.encode(absolutePathToPathFromRootFolder(file.getAbsolutePath, rootFolder), StandardCharsets.UTF_8.displayName()),
-        Some(URLConnection.guessContentTypeFromName(file.getName)).getOrElse("blob"),
-        "http://" + settings.host + ":" + settings.port + "/files/" + URLEncoder.encode(absolutePathToPathFromRootFolder(file.getAbsolutePath, rootFolder), StandardCharsets.UTF_8.displayName())
-      )
+      vFile(file.getName, encodedFilePath(file), calculateContentType(file), buildFileUrl(file))
     }
   }
 
-  private def absolutePathToPathFromRootFolder(abs: String, root: String) = {
-    abs.replace(root, "")
-  }
+  private def encodedFilePath(file: File) =
+    URLEncoder.encode(absolutePathToPathFromRootFolder(file.getAbsolutePath), UTF_8)
+
+  private def absolutePathToPathFromRootFolder(abs: String) =
+    abs.replace(settings.rootFolder, "")
+
+  private def calculateContentType(file: File) =
+    Some(URLConnection.guessContentTypeFromName(file.getName)).getOrElse("blob")
+
+  private def buildFileUrl(file: File) =
+    "http://" + settings.host + ":" + settings.port + "/files/" + encodedFilePath(file)
+
 }
