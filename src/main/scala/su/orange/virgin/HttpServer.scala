@@ -5,11 +5,12 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.server.{Directives, HttpApp, Route}
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 
 class HttpServer(fs: FileSystem, settings: Settings) extends HttpApp {
 
   class RoutingService extends Directives with JsonSupport {
-    val route = {
+    val route = cors() {
       pathPrefix("api") {
         path("fs") {
           get {
