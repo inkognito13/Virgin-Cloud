@@ -16,3 +16,5 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.2.3",
   "ch.megard" %% "akka-http-cors" % "0.3.0"
 )
+
+enablePlugins(JavaAppPackaging)
