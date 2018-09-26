@@ -2,6 +2,7 @@ package su.orange.virgin
 
 import akka.Done
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directives, HttpApp, Route}
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
@@ -11,22 +12,27 @@ class HttpServer(fs: FileSystem, settings: Settings) extends HttpApp {
 
   class RoutingService extends Directives with JsonSupport {
     val route = cors() {
-      pathPrefix("api") {
-        path("fs") {
-          get {
-            complete(fs.listFiles(""))
-          }
+        (pathEndOrSingleSlash & redirectToTrailingSlashIfMissing(StatusCodes.TemporaryRedirect)) {
+          getFromResource("static/index.html")
+        } ~ {
+          getFromResourceDirectory("static")
         } ~
-          pathPrefix("fs" / RemainingPath) { filePath =>
+        pathPrefix("api") {
+          path("fs") {
             get {
-              complete(fs.listFiles(filePath.toString()))
+              complete(fs.listFiles(""))
             }
-          }
+          } ~
+            pathPrefix("fs" / RemainingPath) { filePath =>
+              get {
+                complete(fs.listFiles(filePath.toString()))
+              }
+            }
 
-      } ~
+        } ~
         pathPrefix("files" / RemainingPath) { filePath =>
           get {
-            getFromDirectory(fs.getLocalFilePath(filePath.toString()))
+            getFromDirectory(fs.getFilePathResponse(filePath.toString()))
           }
         }
     }

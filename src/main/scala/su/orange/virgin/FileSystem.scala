@@ -25,8 +25,11 @@ class FileSystem(settings: Settings) {
     }
   }
 
-  def getLocalFilePath(remoteFilePath: String) =
+  private def getLocalFilePath(remoteFilePath: String) =
     settings.rootFolder + "/" + URLDecoder.decode(remoteFilePath, UTF_8)
+  
+  def getFilePathResponse(remoteFilePath: String) =
+    getLocalFilePath(remoteFilePath)
 
   private def isNotHidden(f: File) = !f.getName.startsWith(".")
 
