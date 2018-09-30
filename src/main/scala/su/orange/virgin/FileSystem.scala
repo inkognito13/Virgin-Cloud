@@ -51,6 +51,6 @@ class FileSystem(settings: Settings) {
     Some(URLConnection.guessContentTypeFromName(file.getName)).getOrElse("blob")
 
   private def buildFileUrl(file: File) =
-    "http://" + settings.host + ":" + settings.port + "/files/" + encodedFilePath(file)
+    (if (settings.isSsl) "https://" else "http://") + settings.host + ":" + settings.port + "/files/" + encodedFilePath(file)
 
 }
