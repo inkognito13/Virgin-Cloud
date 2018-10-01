@@ -18,7 +18,7 @@ class FileSystem(settings: Settings) {
     if (dir.exists && dir.isDirectory) {
       val res = dir.listFiles.filter(isNotHidden).map(f => fsToVFile(f, settings.rootFolder))
       log.debug("Found " + res.length + " files in " + localPath)
-      log.trace(res.map(_.toString).mkString(", \n"))
+      log.debug(res.map(_.toString).mkString(", \n"))
       res
     } else {
       throw new IllegalArgumentException(localPath + " is not a directory or not exists")
